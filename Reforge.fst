@@ -23,8 +23,10 @@ let default_string_66 =
 
 // Add relevant event for reforge
 // event Reforged(address indexed account, uint256 amount, string indexed transaction);
+// event Transfer(address indexed from, address indexed to, uint256 value);
 type event = 
     | Reforged : address -> uint -> string_66 -> event
+    | Transfer : address -> address -> uint -> event
 
 (*
 Add all possible roles (they have type string_66 since keccak256 returns hash - hex number of lenght 64)
@@ -68,6 +70,16 @@ noeq type global_state = {
     // mapping role hashes (keccak256 hashes) into _RoleData struct
     _roles          : string_66 -> _RoleData;  
 
+    // uint that presents the total number of tokens in the existence
+    // essentially it presents all tokens that were ever minted
+    _totalSupply    : uint;
+
+    // mapping address to uint (representing the balance of tokens for specific account)
+    _balances       : address -> uint;
+
+    // address that receives transaction fees in native currency
+    _bridgeOwner    : address;
+
 }
 
 let default_state : global_state = {
@@ -84,6 +96,9 @@ let default_state : global_state = {
                                         members = ( fun addr -> false ); 
                                         adminRole = default_string_66 
                                     });    
+    _totalSupply    = Solidity.to_uint 0;
+    _balances       = ( fun x -> Solidity.to_uint 0   );
+    _bridgeOwner   = default_address;
 }
 
 // function that checks if specific account has specific role assgined to them
@@ -95,6 +110,37 @@ let hasRole     (state: global_state)
      Solidity.get (Solidity.get state._roles input_role).members account  
      // returns bool from mapping => `return _roles[role].members[account];`    
 
+
+let _mint   (state: global_state)
+            (account: address)
+            (amount: uint)
+            : ML (option (unit) * global_state) =
+        let s : ref global_state = alloc state in
+            try 
+                // i) check that `account` is not zero address (default address)
+                let check_address = (FStar.UInt160.eq account default_address) in
+                if check_address then 
+                    // if address is zero address raise an exception
+                    (raise Solidity.SolidityZeroAddress; ())
+                else();
+
+                // ii) increase the total supply with add_mod -> thus overflow is not possible
+                s := {!s with _totalSupply = FStar.UInt256.add_mod (!s)._totalSupply amount};
+
+                // iii) increase the account's balance by amount without checking it
+                // TODO currently it uses add_mod, but it should somehow use only add!
+                s :=    {!s with _balances = Solidity.set (!s)._balances account 
+                            (FStar.UInt256.add_mod 
+                                (Solidity.get (!s)._balances account) 
+                                amount
+                            )
+                        };
+
+                // return updated state
+                (Some(), !s)
+            with 
+            // if any other error occurs keep the old state
+            _ -> (None, state)
 
 let reforge     (state: global_state) 
                 (in_msg: msg)
@@ -121,14 +167,25 @@ let reforge     (state: global_state)
                 (raise Solidity.SolidityTransactionAlreadyProcessed; ())
             else ();
 
-            // iii)  set transaciton to true
-            s := {!s with _transactions = Solidity.set (!s)._transactions transaction true };
+            // iii) mint `amount` of tokens to account `to`
+            let (ret__, st__) = _mint (!s) to amount in 
+               match ret__ with 
+                | Some _ -> 
+                            // updated state with minted amount
+                            s:= st__; 
+                            
+                            // iii)  set transaciton to true
+                            s := {!s with _transactions = Solidity.set (!s)._transactions transaction true };
 
-            // iv)  update state with the new event - emit Reforged(to, amount, transaction);
-            s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
+                            // iv)  update state with the new event - emit Reforged(to, amount, transaction);
+                            s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
 
-            // return updated state
-            (Some (), !s)
+                            // return updated state
+                            (Some (), !s)
+
+                | _     -> raise Solidity.SolidityMintError
+
+            
         with
             // if any other error occurs keep the old state
             _ -> (None, state)

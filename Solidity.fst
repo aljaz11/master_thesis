@@ -89,6 +89,8 @@ exception SolidityReturn
 exception SolidityBadReturn
 exception SolidityTransactionAlreadyProcessed
 exception SolidityInsufficientRole
+exception SolidityZeroAddress
+exception SolidityMintError
 
 (*    
      Implementation of updating of map (set), it takes old mapping, key and value, 

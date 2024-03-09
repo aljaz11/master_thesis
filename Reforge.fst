@@ -169,21 +169,48 @@ let reforge     (state: global_state)
 
             // iii) mint `amount` of tokens to account `to`
             let (ret__, st__) = _mint (!s) to amount in 
-               match ret__ with 
-                | Some _ -> 
-                            // updated state with minted amount
-                            s:= st__; 
-                            
-                            // iii)  set transaciton to true
-                            s := {!s with _transactions = Solidity.set (!s)._transactions transaction true };
+                match ret__ with 
+                    | Some _ -> ( 
+                                    // updated state with minted amount
+                                    s:= st__; 
 
-                            // iv)  update state with the new event - emit Reforged(to, amount, transaction);
-                            s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
+                                    // check if fee is not zero (greater than 0)
+                                    let check_fee_not_zero = FStar.UInt256.gt fee (Solidity.to_uint 0) in 
+                                    if check_fee_not_zero then
+                                        (
+                                        // iv) mint `fee` to `_bridgeOwner`
+                                        let (ret__2, st__2) = _mint (!s) (!s)._bridgeOwner fee in 
+                                            match ret__2 with 
+                                                | Some _ -> (
+                                                            // updated state with bridgeOwner fee
+                                                            s:= st__2; 
 
-                            // return updated state
-                            (Some (), !s)
+                                                            // v)  set transaciton to true
+                                                            s := {!s with _transactions = Solidity.set 
+                                                                                          (!s)._transactions transaction true };
 
-                | _     -> raise Solidity.SolidityMintError
+                                                            // vi)  update state with the new event - emit Reforged(to, amount, transaction);
+                                                            s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
+
+                                                            // return updated state
+                                                            (Some (), !s))
+
+                                                | _ -> raise Solidity.SolidityMintError
+                                        )
+                                    else (
+
+                                        // v)  set transaciton to true
+                                        s := {!s with _transactions = Solidity.set (!s)._transactions transaction true };
+
+                                        // vi)  update state with the new event - emit Reforged(to, amount, transaction);
+                                        s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
+
+                                        // return updated state
+                                        (Some (), !s)
+                                    )
+                                )
+
+                    | _     -> raise Solidity.SolidityMintError
 
             
         with

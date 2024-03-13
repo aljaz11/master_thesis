@@ -23,6 +23,8 @@ let to_uint n = FStar.UInt256.uint_to_t (FStar.UInt.to_uint_t 256 n)
 val to_int256: int -> Tot int256
 let to_int256 n = FStar.Int.to_int_t 256 n
 
+let max_uint = to_uint ((pow2 256) - 1)
+
 // Addresses are 20 bytes long == 160 bits
 type address:eqtype = FStar.UInt160.t
 
@@ -91,6 +93,8 @@ exception SolidityTransactionAlreadyProcessed
 exception SolidityInsufficientRole
 exception SolidityZeroAddress
 exception SolidityMintError
+exception SolidityPaused
+exception SolidityOverflow
 
 (*    
      Implementation of updating of map (set), it takes old mapping, key and value, 

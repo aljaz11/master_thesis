@@ -3,6 +3,31 @@ pragma solidity 0.8;
 
 contract ARYZE_eEUR 
 {
+    // Global variable from PausableUpgreadale.sol
+    bool private _paused;
+
+    // Function from PausableUpgreadable.sol
+    function paused() public view virtual returns (bool) {
+        return _paused;
+    }
+    
+    // Function from PausableUpgreadable.sol
+    function _requireNotPaused() internal view virtual {
+        require(!paused(), "Pausable: paused");
+    }
+
+    // Modifier from PausableUpgreadable.sol
+    modifier whenNotPaused() {
+        _requireNotPaused();
+        _;
+    }
+
+    // Hook from main contract ARYZE_eEUR.sol that overrides the original hook
+    function _beforeTokenTransfer(
+        address from,
+        address to,
+        uint256 amount
+    ) internal whenNotPaused {}
 
    // ****** Function _mint and global parameters from  from ERC20Upgradeble.sol *******
     uint256 private _totalSupply; // presents the total number of tokens in the existence
@@ -12,10 +37,7 @@ contract ARYZE_eEUR
     function _mint(address account, uint256 amount) internal virtual {
         require(account != address(0), "ERC20: mint to the zero address");
 
-       /* Following hook checks that the contract is not in paused state and will
-          be ommited in the verification process for the simplicity */
-
-       // _beforeTokenTransfer(address(0), account, amount);
+        _beforeTokenTransfer(address(0), account, amount); // checks if contract is not paused
 
         _totalSupply += amount; // if overflow is suppose to happen it would happen 
                                 // here since there is at most _totalSupply + amount tokens available

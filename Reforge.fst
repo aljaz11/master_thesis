@@ -57,28 +57,31 @@ noeq type _RoleData = {
 }
 
 noeq type global_state = {
-    // list of events
+    (* list of events *)
     events_         : list event;
 
-    // mapping transaction string (transaction hash) to bool
-    // bool is by default set to `false`
+    (* mapping transaction string (transaction hash) to bool
+       bool is by default set to `false` *)
     _transactions   : string_66 -> bool;
 
-    // type that contains all role hashes (keccak256 hashes)
+    (* type that contains all role hashes (keccak256 hashes) *)
     roles           : role;
 
-    // mapping role hashes (keccak256 hashes) into _RoleData struct
+    (* mapping role hashes (keccak256 hashes) into _RoleData struct *)
     _roles          : string_66 -> _RoleData;  
 
-    // uint that presents the total number of tokens in the existence
-    // essentially it presents all tokens that were ever minted
+    (* uint that presents the total number of tokens in the existence
+       essentially it presents all tokens that were ever minted *)
     _totalSupply    : uint;
 
-    // mapping address to uint (representing the balance of tokens for specific account)
+    (* mapping address to uint (representing the balance of tokens for specific account) *)
     _balances       : address -> uint;
 
-    // address that receives transaction fees in native currency
+    (* address that receives transaction fees in native currency *)
     _bridgeOwner    : address;
+
+    (* boolean variable, indicates if contract is paused *)
+    _paused         : bool; 
 
 }
 
@@ -98,19 +101,32 @@ let default_state : global_state = {
                                     });    
     _totalSupply    = Solidity.to_uint 0;
     _balances       = ( fun x -> Solidity.to_uint 0   );
-    _bridgeOwner   = default_address;
+    _bridgeOwner    = default_address;
+    _paused         = false;
 }
 
-// function that checks if specific account has specific role assgined to them
-// from `eEUR_AccessControlUpgredeable.sol`
+(* function that checks if specific account has specific role assgined to them
+   from `eEUR_AccessControlUpgredeable.sol` *)
 let hasRole     (state: global_state)
                 (input_role: string_66)
                 (account: address)
                 : bool =
      Solidity.get (Solidity.get state._roles input_role).members account  
-     // returns bool from mapping => `return _roles[role].members[account];`    
+     // returns bool from mapping => `return _roles[role].members[account];`   
+
+(*  function returns current value of global variable `_paused`  *)
+let paused      (state: global_state)
+                : bool =
+                state._paused
+
+(*  check if addition of two uints results in overflow  *)
+let overflow_check (x:uint) (y:uint) : option uint =
+    // checks if (uint_max - x) < y ==> overflow
+    if UInt256.lt (UInt256.sub Solidity.max_uint x) y then None 
+    else Some (UInt256.add_mod x y)
 
 
+(*  function that mints `amount` of tokens to `account` *)
 let _mint   (state: global_state)
             (account: address)
             (amount: uint)
@@ -124,20 +140,47 @@ let _mint   (state: global_state)
                     (raise Solidity.SolidityZeroAddress; ())
                 else();
 
-                // ii) increase the total supply with add_mod -> thus overflow is not possible
-                s := {!s with _totalSupply = FStar.UInt256.add_mod (!s)._totalSupply amount};
+                // ii) check that contract is not paused (mimioc of _beforeTokenTransfer hook)
+                let hook_check = paused (!s) in 
+                if not hook_check then 
+                    // if contract is paused
+                    (raise Solidity.SolidityPaused; ())
+                else();
 
-                // iii) increase the account's balance by amount without checking it
-                // TODO currently it uses add_mod, but it should somehow use only add!
-                s :=    {!s with _balances = Solidity.set (!s)._balances account 
-                            (FStar.UInt256.add_mod 
-                                (Solidity.get (!s)._balances account) 
-                                amount
-                            )
-                        };
+                // iii) increase the total supply with add_mod -> check if this results in overflow
+                let _totalSupply = (!s)._totalSupply in 
+                let _accountBalance = Solidity.get (!s)._balances account in 
+                (*  Assume that _totalSupply contains all the tokens thus specific account balance is at
+                    most _totalSupply
+                *)
+                let _ = assume (FStar.UInt256.gte _totalSupply _accountBalance) in 
+                match overflow_check (!s)._totalSupply amount with 
+                    | Some res -> (
+                                    s := {!s with _totalSupply = res};
+
+                                    (*  iv) increase the account's balance 
+                                        by amount without checking it (normal add), since 
+                                        it cannot result in overflow -> ** we 
+                                        assume (know) that there is at most 
+                                        _totalSupply tokens ** 
+                                    *)
+                                    s :=    {!s with _balances = Solidity.set (!s)._balances account 
+                                                (FStar.UInt256.add
+                                                    (Solidity.get (!s)._balances account) 
+                                                    amount
+                                                )
+                                            };
+                                    (*
+                                        Verify that updated _totalSupply >= updated _balances[account]
+                                    *)
+                                    let _totalSupply_upd = (!s)._totalSupply in 
+                                    let _accountBalance_upd = (!s)._balances account in
+                                    let _ = assert (FStar.UInt256.gte _totalSupply_upd _accountBalance_upd) in 
 
                 // return updated state
-                (Some(), !s)
+                (Some(), !s))
+                    | _ -> (raise Solidity.SolidityOverflow)
+                
             with 
             // if any other error occurs keep the old state
             _ -> (None, state)

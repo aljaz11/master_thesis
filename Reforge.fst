@@ -4,6 +4,7 @@ open Solidity
 open FStar.Preorder
 open FStar.All
 open FStar.String
+open Statements
 
 (* 
     New type string_66 that only allows strings with 66 characters
@@ -11,16 +12,10 @@ open FStar.String
 *)
 type string_66 = s:string {length s = 66}   // another way to represent 32byte values
 
-val make_string_66 : s:string -> Tot (option string_66)
-let make_string_66 s =
-  if String.length s = 66 then Some s else None
-
-val default_string_66 : string_66
-let default_string_66 = 
-  match make_string_66 "0x0000000000000000000000000000000000000000000000000000000000000000" with
-  | Some s -> s
-  | _ -> failwith "failed"
-
+let default_string_66 : string_66 = 
+    let def_str = "0x0000000000000000000000000000000000000000000000000000000000000000" in
+    let _ = assume(String.length def_str = 66) in 
+    def_str
 // Add relevant event for reforge
 // event Reforged(address indexed account, uint256 amount, string indexed transaction);
 // event Transfer(address indexed from, address indexed to, uint256 value);
@@ -123,7 +118,7 @@ let paused      (state: global_state)
 let overflow_check (x:uint) (y:uint) : option uint =
     // checks if (uint_max - x) < y ==> overflow
     if UInt256.lt (UInt256.sub Solidity.max_uint x) y then None 
-    else Some (UInt256.add_mod x y)
+    else Some (UInt256.add x y) // overflow not possible!
 
 
 (*  function that mints `amount` of tokens to `account` *)
@@ -149,7 +144,7 @@ let _mint   (state: global_state)
 
                 // iii) increase the total supply with add_mod -> check if this results in overflow
                 let _totalSupply = (!s)._totalSupply in 
-                let _accountBalance = Solidity.get (!s)._balances account in 
+                let _accountBalance = (Solidity.get (!s)._balances) account in 
                 (*  Assume that _totalSupply contains all the tokens thus specific account balance is at
                     most _totalSupply
                 *)
@@ -174,8 +169,13 @@ let _mint   (state: global_state)
                                         Verify that updated _totalSupply >= updated _balances[account]
                                     *)
                                     let _totalSupply_upd = (!s)._totalSupply in 
-                                    let _accountBalance_upd = (!s)._balances account in
-                                    let _ = assert (FStar.UInt256.gte _totalSupply_upd _accountBalance_upd) in 
+                                    let _accountBalance_upd = (Solidity.get (!s)._balances) account in
+                                    let _ = assert (FStar.UInt256.gte _totalSupply_upd _accountBalance_upd) in
+                                    
+                                    (*
+                                        Verify that overlof cannot happen using lemma
+                                    *)
+                                    let _ = Statements.lemma_overflow_impossible  _totalSupply_upd _accountBalance in 
 
                 // return updated state
                 (Some(), !s))

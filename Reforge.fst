@@ -177,6 +177,11 @@ let _mint   (state: global_state)
                                     *)
                                     let _ = Statements.lemma_overflow_impossible  _totalSupply_upd _accountBalance in 
 
+                                    (*
+                                        Verify that the updated `_accountBalance` has increased exactly for `amount`
+                                    *)
+                                    let _ = assert (FStar.UInt256.eq (FStar.UInt256.add _accountBalance amount) _accountBalance_upd) in
+
                 // return updated state
                 (Some(), !s))
                     | _ -> (raise Solidity.SolidityOverflow)
@@ -250,12 +255,12 @@ let reforge     (state: global_state)
 
                                         // return updated state
                                         (Some (), !s)
-                                    )
+                                    ) 
                                 )
 
                     | _     -> raise Solidity.SolidityMintError
 
-            
+
         with
             // if any other error occurs keep the old state
             _ -> (None, state)

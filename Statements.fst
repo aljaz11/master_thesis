@@ -16,19 +16,9 @@ let lemma_overflow_impossible (_totalSupply_upd:uint) (_accountBalance_upd:uint)
                                         (ensures  (FStar.UInt256.lte _accountBalance_upd Solidity.max_uint)) 
                                         = ()
 
-(*	    Statement01: Global state reamins valid after refogrge *)
-// TODO
+(*	    
+        Statement02: Reentrancy attack is not possible in reforge 
 
-(*	    Statement02: After the reforge execution account 
-        `to`'s balance is increased for exactly `amount`
-*)
-// TODO
-
-(*	    Statement03: After the reforge execution account 
-        `msg.sender`'s balance is decreased for exactly `amount` (+ `fee`)
-*)
-//TODO 
-
-(*	    Statement04: Reentrancy attack is not possible in reforge 
+        Idea is to use properties of `Lexicographic orderings`
 *)
 // TODO

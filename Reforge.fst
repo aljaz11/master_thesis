@@ -114,7 +114,9 @@ let paused      (state: global_state)
                 : bool =
                 state._paused
 
-(*  check if addition of two uints results in overflow  *)
+(*  check if addition of two uints results in overflow
+    e.g., in _mint => x = _totalSupply and y = amount
+ *)
 let overflow_check (x:uint) (y:uint) : option uint =
     // checks if (uint_max - x) < y ==> overflow
     if UInt256.lt (UInt256.sub Solidity.max_uint x) y then None 

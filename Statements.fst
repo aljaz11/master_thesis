@@ -15,10 +15,3 @@ let lemma_overflow_impossible (_totalSupply_upd:uint) (_accountBalance_upd:uint)
                                                      (FStar.UInt256.gte _totalSupply_upd _accountBalance_upd)))
                                         (ensures  (FStar.UInt256.lte _accountBalance_upd Solidity.max_uint)) 
                                         = ()
-
-(*	    
-        Statement02: Reentrancy attack is not possible in reforge 
-
-        Idea is to use properties of `Lexicographic orderings`
-*)
-// TODO

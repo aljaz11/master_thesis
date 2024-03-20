@@ -5,123 +5,8 @@ open FStar.Preorder
 open FStar.All
 open FStar.String
 open Statements
-
-(* 
-    New type string_66 that only allows strings with 66 characters
-    effectively simulating hexadecimal number of length 64 (+ '0x') == 256 bit number
-*)
-type string_66 = s:string {length s = 66}   // another way to represent 32byte values
-
-let default_string_66 : string_66 = 
-    let def_str = "0x0000000000000000000000000000000000000000000000000000000000000000" in
-    let _ = assume(String.length def_str = 66) in 
-    def_str
-// Add relevant event for reforge
-// event Reforged(address indexed account, uint256 amount, string indexed transaction);
-// event Transfer(address indexed from, address indexed to, uint256 value);
-type event = 
-    | Reforged : address -> uint -> string_66 -> event
-    | Transfer : address -> address -> uint -> event
-
-(*
-Add all possible roles (they have type string_66 since keccak256 returns hash - hex number of lenght 64)
-*)
-(*
-type role =  
-	| PAUSER_ROLE        : string_66 -> role
-	| MINTER_ROLE        : string_66 -> role
-	| UPGRADER_ROLE      : string_66 -> role
-	| BRIDGE_OWNER_ROLE  : string_66 -> role
-    | ADMIN_eEUR         : string_66 -> role
-*)
-type role = { 
-	_PAUSER_ROLE        : string_66;
-	_MINTER_ROLE        : string_66;
-	_UPGRADER_ROLE      : string_66; 
-	_BRIDGE_OWNER_ROLE  : string_66;
-    _ADMIN_eEUR         : string_66;
-}
-
-(*
-Struct from `eEUR_AccessControlUpgreadable.sol` that defines if specific address 
-has assigned specific role (`true`) 
-*)
-noeq type _RoleData = {
-    members     : address -> bool;
-    adminRole   : string_66
-}
-
-noeq type global_state = {
-    (* list of events *)
-    events_         : list event;
-
-    (* mapping transaction string (transaction hash) to bool
-       bool is by default set to `false` *)
-    _transactions   : string_66 -> bool;
-
-    (* type that contains all role hashes (keccak256 hashes) *)
-    roles           : role;
-
-    (* mapping role hashes (keccak256 hashes) into _RoleData struct *)
-    _roles          : string_66 -> _RoleData;  
-
-    (* uint that presents the total number of tokens in the existence
-       essentially it presents all tokens that were ever minted *)
-    _totalSupply    : uint;
-
-    (* mapping address to uint (representing the balance of tokens for specific account) *)
-    _balances       : address -> uint;
-
-    (* address that receives transaction fees in native currency *)
-    _bridgeOwner    : address;
-
-    (* boolean variable, indicates if contract is paused *)
-    _paused         : bool; 
-
-}
-
-let default_state : global_state = {
-    events_         = [];
-    _transactions   = ( fun x -> false );
-    roles           = {
-                        _PAUSER_ROLE        = default_string_66;
-                        _MINTER_ROLE        = default_string_66;
-                        _UPGRADER_ROLE      = default_string_66;
-                        _BRIDGE_OWNER_ROLE  = default_string_66;
-                        _ADMIN_eEUR         = default_string_66;
-    };
-    _roles          = ( fun role -> { 
-                                        members = ( fun addr -> false ); 
-                                        adminRole = default_string_66 
-                                    });    
-    _totalSupply    = Solidity.to_uint 0;
-    _balances       = ( fun x -> Solidity.to_uint 0   );
-    _bridgeOwner    = default_address;
-    _paused         = false;
-}
-
-(* function that checks if specific account has specific role assgined to them
-   from `eEUR_AccessControlUpgredeable.sol` *)
-let hasRole     (state: global_state)
-                (input_role: string_66)
-                (account: address)
-                : bool =
-     Solidity.get (Solidity.get state._roles input_role).members account  
-     // returns bool from mapping => `return _roles[role].members[account];`   
-
-(*  function returns current value of global variable `_paused`  *)
-let paused      (state: global_state)
-                : bool =
-                state._paused
-
-(*  check if addition of two uints results in overflow
-    e.g., in _mint => x = _totalSupply and y = amount
- *)
-let overflow_check (x:uint) (y:uint) : option uint =
-    // checks if (uint_max - x) < y ==> overflow
-    if UInt256.lt (UInt256.sub Solidity.max_uint x) y then None 
-    else Some (UInt256.add x y) // overflow not possible!
-
+open GlobalState
+open CommonFunctions
 
 (*  function that mints `amount` of tokens to `account` *)
 let _mint   (state: global_state)
@@ -202,6 +87,8 @@ let reforge     (state: global_state)
                 (transaction: string_66)
                 : ML (option (unit) * global_state) =
     let s : ref global_state = alloc state in 
+        // Apply default state
+        s := default_state;
         try 
             // i)   check if account has correct role permission
             let check_requirement_1 = (hasRole (!s) (!s).roles._BRIDGE_OWNER_ROLE (in_msg).sender) in

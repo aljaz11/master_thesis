@@ -25,7 +25,7 @@ let to_int256 n = FStar.Int.to_int_t 256 n
 
 let max_uint = to_uint ((pow2 256) - 1)
 
-// Addresses are 20 bytes long == 160 bits
+// Addresses are 20 bytes long == 160 bits == 40 hexadecimal numbers
 type address:eqtype = FStar.UInt160.t
 
 val to_address: int -> Tot address

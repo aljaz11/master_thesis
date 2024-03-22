@@ -95,6 +95,7 @@ exception SolidityZeroAddress
 exception SolidityMintError
 exception SolidityPaused
 exception SolidityOverflow
+exception SolidityAmountExceedsBalance
 
 (*    
      Implementation of updating of map (set), it takes old mapping, key and value, 

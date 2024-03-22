@@ -19,14 +19,14 @@ let _mint   (state: global_state)
                 let check_address = (FStar.UInt160.eq account default_address) in
                 if check_address then 
                     // if address is zero address raise an exception
-                    (raise Solidity.SolidityZeroAddress; ())
+                    raise Solidity.SolidityZeroAddress
                 else();
 
-                // ii) check that contract is not paused (mimioc of _beforeTokenTransfer hook)
+                // ii) check that contract is not paused (mimic of _beforeTokenTransfer hook)
                 let hook_check = paused (!s) in 
                 if not hook_check then 
                     // if contract is paused
-                    (raise Solidity.SolidityPaused; ())
+                    raise Solidity.SolidityPaused
                 else();
 
                 // iii) increase the total supply with add_mod -> check if this results in overflow
@@ -94,14 +94,14 @@ let reforge     (state: global_state)
             let check_requirement_1 = (hasRole (!s) (!s).roles._BRIDGE_OWNER_ROLE (in_msg).sender) in
             let check_requirement_2 = (hasRole (!s) (!s).roles._MINTER_ROLE (in_msg).sender) in 
             if not (check_requirement_1 && check_requirement_2) then 
-                (raise Solidity.SolidityInsufficientRole; ())
+                raise Solidity.SolidityInsufficientRole
             else ();
             
             // ii)   check if requirement is satisfied (transaction has not been initialized yet)
             let check_requirement_3 = Solidity.get (!s)._transactions transaction in 
             if check_requirement_3 then 
                 // if it is `true` then we need to raise an exception
-                (raise Solidity.SolidityTransactionAlreadyProcessed; ())
+                raise Solidity.SolidityTransactionAlreadyProcessed
             else ();
 
             // iii) mint `amount` of tokens to account `to`

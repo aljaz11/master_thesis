@@ -14,6 +14,11 @@ let default_string_66 : string_66 =
     def_str
 
 (*
+    Default address of ARYZE_eEUR contract
+*)
+let default_eEUR_address : address = to_address 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f
+
+(*
     Default address for roles
 *)
 let multiSigTreasury : address = to_address 0xaB23968d766D445BC9b370512d3085c345AcB235
@@ -178,8 +183,14 @@ let default_state : global_state = {
     _paused         = false;
     _bridgePaused   = false;
     _minimumBridgeFee   = Solidity.to_uint 0;           
-    _sameTokens     = ( fun x -> default_address );     // TODO
-    // Ether_chain = 137 | eEUR (0x735fa792e731a2e8F83F32eb539841b7B72e6d8f) - https://etherscan.io/tx/0xc81b5f69aeda6eaa159f244d3aa5ae56a905c336b455f6dd37675937ef4f7c26 
+    _sameTokens     = ( fun x ->
+                                (*  Info from etherscan: Ether_chain == 1 AND eEUR_token_address == 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f 
+                                    https://etherscan.io/tx/0xc81b5f69aeda6eaa159f244d3aa5ae56a905c336b455f6dd37675937ef4f7c26 
+                                *)
+                                if UInt256.eq x (to_uint 1) then default_eEUR_address
+                                else default_address 
+                      ); 
+    
     _minimumSendToChainAmount   = Solidity.to_uint 10000000000000000000000;   (* default value is 10^22 *)
     _feeTreasury    = multiSigTreasury;
     _bridgeFee      = Solidity.to_uint 300000; (* 300000 == 0.3% *)

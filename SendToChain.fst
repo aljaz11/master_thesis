@@ -89,3 +89,69 @@ let _transfer 	(state:global_state)
         with
             // if any other error occurs keep the old state (revert)
             _ -> (None, state)
+
+(* function _burn *)
+let _burn 		(state:global_state)
+				(account:address)
+				(amount:uint)
+				: ML (option (unit) * global_state) =
+		let s : ref global_state = alloc state in
+		try 		
+			(* i) check that `account` is not zero address (default address) *)
+			let check_from = (FStar.UInt160.eq account default_address) in
+			if check_from then 
+				// if address is zero address raise an exception
+				raise Solidity.SolidityZeroAddress
+			else();
+
+			(* ii) check that contract is not paused (mimic of _beforeTokenTransfer hook) *)
+			let hook_check = paused (!s) in 
+			if not hook_check then 
+				// if contract is paused
+				raise Solidity.SolidityPaused
+			else();
+
+			let accountBalance = Solidity.get (!s)._balances account in 
+				(* iii) check that accountBalance >= amount *)
+				let check_balance = (FStar.UInt256.gte accountBalance amount) in 
+				if not check_balance then 
+					// if amount > accountBalance
+					raise Solidity.SolidityAmountExceedsBalance
+				else ();	
+			
+			(***	Unchecked part	
+						- 	we can surely assume following claims/facts:
+									- `_totalSupply` is bounded by `max_uint` 
+									  (Solidity automatic check from reforge function)
+									- `_totalSupply` is greater [** or equal **] then `accountBalance` 
+									  [** if `accountBalance` contains all available tokens **]
+			***)
+			let _totalSupply = (!s)._totalSupply in 
+			let _ = assume (FStar.UInt256.gte Solidity.max_uint _totalSupply) in 
+			let _ = assume (FStar.UInt256.gte _totalSupply accountBalance) in 
+			
+			let differenceBefore = FStar.UInt256.sub _totalSupply accountBalance in 
+			(*	decrease account's balance by amount,  `amount <= accountBalance` *)
+				s := 	{!s with _balances = Solidity.set (!s)._balances account 
+							( FStar.UInt256.sub accountBalance amount )
+						};
+			
+			(*	decrease _totalSupply by amount, `amount <= accountBalance <= _totalSupply` *)
+				s := 	{!s with _totalSupply =  ( FStar.UInt256.sub (!s)._totalSupply amount )};
+			
+			(* iv)  update state with the new event - emit Transfer(account, address(0), amount); *)
+                s := 	{!s with events_ = Transfer account default_address amount :: (!s).events_};
+			
+			(*	ensure that difference between `_totalSupply` and `_balances[account]` remains the 
+				same before and after update							
+			*)
+			let _totalSupplyUpdated = (!s)._totalSupply in 
+			let accountBalanceUpdated = Solidity.get (!s)._balances account in 
+			let differenceAfter = FStar.UInt256.sub _totalSupplyUpdated accountBalanceUpdated in 
+			let _ = assert (FStar.UInt256.eq differenceBefore differenceAfter) in
+
+		// return updated state
+        (Some (), !s)
+        with
+            // if any other error occurs keep the old state (revert)
+            _ -> (None, state)

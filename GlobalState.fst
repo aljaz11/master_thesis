@@ -66,10 +66,14 @@ let bridger_owner_keccak : string_66 =
     Relevant events:
         - event Reforged(address indexed account, uint256 amount, string indexed transaction);
         - event Transfer(address indexed from, address indexed to, uint256 value);
+        -    event SentToChain( address indexed account, uint256 amount, 
+                                uint256 fromChainId, uint256 indexed destinationChainId, 
+                                address indexed destinationToken);
 *)
 type event = 
-    | Reforged : address -> uint -> string_66 -> event
-    | Transfer : address -> address -> uint -> event
+    | Reforged      : address -> uint -> string_66 -> event
+    | Transfer      : address -> address -> uint -> event 
+    | SentToChain   : address -> uint -> uint -> uint -> address -> event
 
 (*
 Add all possible roles (they have type string_66 since keccak256 returns hash - hex number of lenght 64)
@@ -97,6 +101,13 @@ has assigned specific role (`true`)
 noeq type _RoleData = {
     members     : address -> bool;
     adminRole   : string_66
+}
+
+(*
+Struct symulating `block` property (only what is needed/relevant in SendToChain function)
+*)
+noeq type block_t = {
+    chainid     : uint;
 }
 
 noeq type global_state = {
@@ -144,6 +155,9 @@ noeq type global_state = {
 
     (* uint that presetns the bridge transaction fee percentage (10^6 == 1%) *)
     _bridgeFee          : uint;
+
+    (* information about current block *)
+    block               : block_t;
 }
 
 let default_state : global_state = {
@@ -184,14 +198,20 @@ let default_state : global_state = {
     _bridgePaused   = false;
     _minimumBridgeFee   = Solidity.to_uint 0;           
     _sameTokens     = ( fun x ->
-                                (*  Info from etherscan: Ether_chain == 1 AND eEUR_token_address == 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f 
-                                    https://etherscan.io/tx/0xc81b5f69aeda6eaa159f244d3aa5ae56a905c336b455f6dd37675937ef4f7c26 
+                                (*  Info from: https://chainlist.org/
+                                        ChainID of:
+                                            - Ethereum Mainnet is 1             (0x1)       => eEUR 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f (proxy)
+                                            - Polygon Mainnet is 137            (0x89)      => eEUR 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f (proxy)
+                                            - BNB Smart Chain Mainnet is 56     (0x38)      => eEUR 0x735fa792e731a2e8F83F32eb539841b7B72e6d8f (proxy)
                                 *)
                                 if UInt256.eq x (to_uint 1) then default_eEUR_address
+                                else if UInt256.eq x (to_uint 0x89) then default_eEUR_address
+                                else if UInt256.eq x (to_uint 0x38) then default_eEUR_address
                                 else default_address 
                       ); 
     
     _minimumSendToChainAmount   = Solidity.to_uint 10000000000000000000000;   (* default value is 10^22 *)
     _feeTreasury    = multiSigTreasury;
     _bridgeFee      = Solidity.to_uint 300000; (* 300000 == 0.3% *)
+    block           = { chainid = to_uint 1};  (* Default chainid is Ethereum Mainnet *)
 }

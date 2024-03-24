@@ -155,3 +155,89 @@ let _burn 		(state:global_state)
         with
             // if any other error occurs keep the old state (revert)
             _ -> (None, state)
+
+(* function sendToChain *)
+let sendToChain		(state:global_state)
+					(in_msg: msg)
+					(amount:uint)
+					(destinationChainId:uint)
+					(destinationToken:address)
+					: ML (option (unit) * global_state) =
+	let s : ref global_state = alloc state in
+	    // Apply default state
+        s := default_state;
+		try 
+			(* i) check that bridge is not paused `_bridgePaused == false` *)
+			if bridgePaused_check (!s) then 
+				// if bridge is paused raise an exception
+				raise Solidity.SolidityBridgePaused 
+			else ();
+
+			(* ii) check that fee is big enough `msg.value >= _minimumBridgeFee` *)
+			if FStar.UInt256.lt in_msg.value (!s)._minimumBridgeFee then 
+				// if msg.value < _minimumBridgeFee
+				raise Solidity.SolidityFeeTooSmall 
+			else ();
+
+			(* iii) Check that `amount >= _minimumSendToChainAmount` 
+					if token is beeing converted (different `destinationToken`)
+			*)
+			if not ((Solidity.get (!s)._sameTokens destinationChainId) = destinationToken) then 
+				if FStar.UInt256.lt amount (!s)._minimumSendToChainAmount then 
+					raise Solidity.SolidityMinimalAmountNotMet
+				else ()
+			else ();
+
+			(* iv) check that `destinationToken` is not zero address (default address) *)
+			let check_dt = (FStar.UInt160.eq destinationToken default_address) in
+			if check_dt then 
+				// if address is zero address raise an exception
+				raise Solidity.SolidityZeroAddress
+			else();
+
+			(*	Calculate fee -> (amount * _bridgeFee) / 100000000 	*)
+			let fee = FStar.UInt256.(FStar.UInt256.add_mod amount (!s)._bridgeFee) in 
+
+			(* v) check that amount is bigger then fee `amount > fee` *)
+			let check_amount = FStar.UInt256.lte amount fee in 
+			if check_amount then 
+				// if `check_amount <= fee`
+				raise Solidity.SolidityInsufficientAmount 
+			else();
+
+			(*	Calculate difference `res`	*)
+			let res = FStar.UInt256.sub amount fee in 
+
+			(*	Call `transfer`	*)
+            let (ret__, st__) = _transfer (!s) in_msg.sender (!s)._feeTreasury fee in 
+				match ret__ with 
+                    | Some _ -> ( 
+								// updated state after transfer
+								s:= st__; 
+
+								(*	Call `burn`	*)
+								let (ret__2, st__2) = _burn (!s) in_msg.sender res in 
+									match ret__2 with 
+										| Some _ -> (
+														// updated state after burning
+														s:= st__2; 
+
+														(*	Call `_bridgeOwner.transfer(msg.value)` is an external call
+															to the trusted account/contract `_bridgeOwner` thus it can
+															be assumed as true
+														*)
+
+														(* vi)  update state with the new event - emit Transfer(account, address(0), amount); *)
+														s := 	{!s with events_ = SentToChain in_msg.sender (FStar.UInt256.sub amount fee) 
+																(!s).block.chainid destinationChainId destinationToken :: (!s).events_};
+
+														// return updated state
+														(Some (), !s)
+													)
+
+										| _ -> raise Solidity.SolidityBurnError		
+								)
+					| _     -> raise Solidity.SolidityTransferError
+        with
+            // if any other error occurs keep the old state (revert)
+            _ -> (None, state)	

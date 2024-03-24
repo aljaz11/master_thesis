@@ -96,6 +96,12 @@ exception SolidityMintError
 exception SolidityPaused
 exception SolidityOverflow
 exception SolidityAmountExceedsBalance
+exception SolidityBridgePaused
+exception SolidityFeeTooSmall
+exception SolidityMinimalAmountNotMet
+exception SolidityInsufficientAmount
+exception SolidityTransferError
+exception SolidityBurnError
 
 (*    
      Implementation of updating of map (set), it takes old mapping, key and value, 

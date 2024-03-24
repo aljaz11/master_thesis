@@ -1,5 +1,5 @@
 module SendToChain
-
+// Comand to produce checked files: e.g. "fstar FStar.UInt160.fst --cache_checked_modules"
 open FStar.All
 open Solidity
 open GlobalState

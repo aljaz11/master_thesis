@@ -60,6 +60,14 @@ let _transfer 	(state:global_state)
 				let _ = assume (FStar.UInt256.gte Solidity.max_uint _totalSupply) in 
 				let _ = assume (FStar.UInt256.gte _totalSupply fromBalance) in 
 				let _ = assume (FStar.UInt256.gte (FStar.UInt256.sub _totalSupply fromBalance) toBalance) in 
+
+				(*	ensure that `toBalance + amount` cannot result in overflow (cannot be more than totalSupply) 
+					`to + amount <= total_supply` <==> `to <= total_supply - amount`
+				*)
+				let _ = assert (FStar.UInt256.lte toBalance (FStar.UInt256.sub _totalSupply amount)) in 
+
+				(* ensure that `amount <= from` -- this should be always true because of the contraint	*)
+				let _ = assert (FStar.UInt256.lte amount fromBalance) in 
 				
 				let sumBeforeUpdate = FStar.UInt256.add fromBalance toBalance in 
 				(*	decrease from's balance by amount  -> amount <= from's balance *)
@@ -82,6 +90,8 @@ let _transfer 	(state:global_state)
 				let toUpdatedBalance = Solidity.get (!s)._balances to in 
 				let sumAfterUpdate = FStar.UInt256.add fromUpdatedBalance toUpdatedBalance in 
 				let _ = assert (FStar.UInt256.eq sumBeforeUpdate sumAfterUpdate) in
+
+				(* ensure that fromUpdateBalance is always greater or equal to zero (underflow not possible) *)
 
 
 		// return updated state
@@ -129,6 +139,9 @@ let _burn 		(state:global_state)
 			let _totalSupply = (!s)._totalSupply in 
 			let _ = assume (FStar.UInt256.gte Solidity.max_uint _totalSupply) in 
 			let _ = assume (FStar.UInt256.gte _totalSupply accountBalance) in 
+
+			(*	ensure that amount is les or equal to account balance --it has to hold because of the check	*)
+			let _ = assert (FStar.UInt256.lte amount accountBalance) in 
 			
 			let differenceBefore = FStar.UInt256.sub _totalSupply accountBalance in 
 			(*	decrease account's balance by amount,  `amount <= accountBalance` *)

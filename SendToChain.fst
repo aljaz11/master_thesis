@@ -81,7 +81,12 @@ let _transfer 	(state:global_state)
 				};
 
 				(* v)  update state with the new event - emit Transfer(from, to, amount); *)
+				let events_length_old = length (!s).events_ in
                 s := 	{!s with events_ = Transfer from to amount :: (!s).events_};
+
+				// verify that the events_ list has grown - event has been emitted
+				let events_length_new = length (!s).events_ in 
+				let _ = assert(events_length_old < events_length_new) in 
 
 				(*	ensure that sum of to's and from's balance is equal before and after update
 					`proof of the sum preservation`
@@ -90,9 +95,6 @@ let _transfer 	(state:global_state)
 				let toUpdatedBalance = Solidity.get (!s)._balances to in 
 				let sumAfterUpdate = FStar.UInt256.add fromUpdatedBalance toUpdatedBalance in 
 				let _ = assert (FStar.UInt256.eq sumBeforeUpdate sumAfterUpdate) in
-
-				(* ensure that fromUpdateBalance is always greater or equal to zero (underflow not possible) *)
-
 
 		// return updated state
         (Some (), !s)
@@ -148,12 +150,22 @@ let _burn 		(state:global_state)
 				s := 	{!s with _balances = Solidity.set (!s)._balances account 
 							( FStar.UInt256.sub accountBalance amount )
 						};
+			// Verify that updated balance is exactly for amount smaller then before
+			let updatedBalance = Solidity.get (!s)._balances account in 
+			let _ = assert(FStar.UInt256.eq
+							(FStar.UInt256.add updatedBalance amount)
+							accountBalance) in 
 			
 			(*	decrease _totalSupply by amount, `amount <= accountBalance <= _totalSupply` *)
 				s := 	{!s with _totalSupply =  ( FStar.UInt256.sub (!s)._totalSupply amount )};
 			
 			(* iv)  update state with the new event - emit Transfer(account, address(0), amount); *)
+				let events_length_old = length (!s).events_ in 
                 s := 	{!s with events_ = Transfer account default_address amount :: (!s).events_};
+			
+			// verify that the events_ list has grown - event has been emitted
+				let events_length_new = length (!s).events_ in 
+				let _ = assert(events_length_old < events_length_new) in 
 			
 			(*	ensure that difference between `_totalSupply` and `_balances[account]` remains the 
 				same before and after update							
@@ -186,11 +198,19 @@ let sendToChain		(state:global_state)
 				raise Solidity.SolidityBridgePaused 
 			else ();
 
+			// verify that the bridge cannot be paused
+			let notPaused = not (bridgePaused_check (!s)) in 
+			let _ = assert(notPaused) in 
+
 			(* ii) check that fee is big enough `msg.value >= _minimumBridgeFee` *)
 			if FStar.UInt256.lt in_msg.value (!s)._minimumBridgeFee then 
 				// if msg.value < _minimumBridgeFee
 				raise Solidity.SolidityFeeTooSmall 
 			else ();
+
+			// Verify that msg.value is >= _minimumBridgeFee
+			let current_min_bridge_fee = (!s)._minimumBridgeFee in 
+			let _ = assert(FStar.UInt256.gte in_msg.value current_min_bridge_fee) in 
 
 			(* iii) Check that `amount >= _minimumSendToChainAmount` 
 					if token is beeing converted (different `destinationToken`)
@@ -209,7 +229,7 @@ let sendToChain		(state:global_state)
 			else();
 
 			(*	Calculate fee -> (amount * _bridgeFee) / 100000000 	*)
-			let fee = FStar.UInt256.(FStar.UInt256.add_mod amount (!s)._bridgeFee) in 
+			let fee = FStar.UInt256.add_mod amount (!s)._bridgeFee in 
 
 			(* v) check that amount is bigger then fee `amount > fee` *)
 			let check_amount = FStar.UInt256.lte amount fee in 
@@ -241,8 +261,13 @@ let sendToChain		(state:global_state)
 														*)
 
 														(* vi)  update state with the new event - emit Transfer(account, address(0), amount); *)
+														let events_length_old = length (!s).events_ in
 														s := 	{!s with events_ = SentToChain in_msg.sender (FStar.UInt256.sub amount fee) 
 																(!s).block.chainid destinationChainId destinationToken :: (!s).events_};
+														
+														 // verify that the events_ list has grown - event has been emitted
+														let events_length_new = length (!s).events_ in 
+														let _ = assert(events_length_old < events_length_new) in 
 
 														// return updated state
 														(Some (), !s)

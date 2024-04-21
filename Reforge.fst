@@ -104,7 +104,7 @@ let reforge     (state: global_state)
             // i)   check if account has correct role permission
             let check_requirement_1 = (hasRole (!s) (!s).roles._BRIDGE_OWNER_ROLE (in_msg).sender) in
             let check_requirement_2 = (hasRole (!s) (!s).roles._MINTER_ROLE (in_msg).sender) in 
-            if not (check_requirement_1 && check_requirement_2) then 
+            if not (check_requirement_1 || check_requirement_2) then 
                 raise Solidity.SolidityInsufficientRole
             else ();
 

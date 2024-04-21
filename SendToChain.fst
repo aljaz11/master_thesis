@@ -14,21 +14,21 @@ let _transfer 	(state:global_state)
     let s : ref global_state = alloc state in
 		try 
 			(* i) check that `from` is not zero address (default address) *)
-					let check_from = (FStar.UInt160.eq from default_address) in
+					let check_from : bool = (FStar.UInt160.eq from default_address) in
 					if check_from then 
 						// if address is zero address raise an exception
 						raise Solidity.SolidityZeroAddress
 					else();
 			
 			 (* ii) check that `to` is not zero address (default address) *)
-					let check_to = (FStar.UInt160.eq to default_address) in
+					let check_to : bool = (FStar.UInt160.eq to default_address) in
 					if check_to then 
 						// if address is zero address raise an exception
 						raise Solidity.SolidityZeroAddress
 					else();
 			
 			 (* iii) check that contract is not paused (mimic of _beforeTokenTransfer hook) *)
-                let hook_check = paused (!s) in 
+                let hook_check : bool = paused (!s) in 
                 if not hook_check then 
                     // if contract is paused
                     raise Solidity.SolidityPaused
@@ -36,7 +36,7 @@ let _transfer 	(state:global_state)
 			
 			let fromBalance : uint = Solidity.get (!s)._balances from in 
 				(* iv) check that fromBalance >= amount *)
-				let check_balance = (FStar.UInt256.gte fromBalance amount) in 
+				let check_balance : bool = (FStar.UInt256.gte fromBalance amount) in 
 				if not check_balance then 
 					// if amount > fromBalance
 					raise Solidity.SolidityAmountExceedsBalance
@@ -55,8 +55,8 @@ let _transfer 	(state:global_state)
 								substracting and incrementing the same amount since we verified (checked)
 								that amount <= fromBalance
 				***)
-				let _totalSupply = (!s)._totalSupply in 
-				let toBalance = Solidity.get (!s)._balances to in 
+				let _totalSupply : uint = (!s)._totalSupply in 
+				let toBalance : uint = Solidity.get (!s)._balances to in 
 				let _ = assume (FStar.UInt256.gte Solidity.max_uint _totalSupply) in 
 				let _ = assume (FStar.UInt256.gte _totalSupply fromBalance) in 
 				let _ = assume (FStar.UInt256.gte (FStar.UInt256.sub _totalSupply fromBalance) toBalance) in 
@@ -69,7 +69,7 @@ let _transfer 	(state:global_state)
 				(* ensure that `amount <= from` -- this should be always true because of the contraint	*)
 				let _ = assert (FStar.UInt256.lte amount fromBalance) in 
 				
-				let sumBeforeUpdate = FStar.UInt256.add fromBalance toBalance in 
+				let sumBeforeUpdate : uint = FStar.UInt256.add fromBalance toBalance in 
 				(*	decrease from's balance by amount  -> amount <= from's balance *)
 				s := 	{!s with _balances = Solidity.set (!s)._balances from 
 							( FStar.UInt256.sub fromBalance amount )
@@ -81,19 +81,19 @@ let _transfer 	(state:global_state)
 				};
 
 				(* v)  update state with the new event - emit Transfer(from, to, amount); *)
-				let events_length_old = length (!s).events_ in
+				let events_length_old : nat = length (!s).events_ in
                 s := 	{!s with events_ = Transfer from to amount :: (!s).events_};
 
 				// verify that the events_ list has grown - event has been emitted
-				let events_length_new = length (!s).events_ in 
+				let events_length_new : nat = length (!s).events_ in 
 				let _ = assert(events_length_old < events_length_new) in 
 
 				(*	ensure that sum of to's and from's balance is equal before and after update
 					`proof of the sum preservation`
 				*)
-				let fromUpdatedBalance = Solidity.get (!s)._balances from in 
-				let toUpdatedBalance = Solidity.get (!s)._balances to in 
-				let sumAfterUpdate = FStar.UInt256.add fromUpdatedBalance toUpdatedBalance in 
+				let fromUpdatedBalance : uint = Solidity.get (!s)._balances from in 
+				let toUpdatedBalance : uint = Solidity.get (!s)._balances to in 
+				let sumAfterUpdate : uint = FStar.UInt256.add fromUpdatedBalance toUpdatedBalance in 
 				let _ = assert (FStar.UInt256.eq sumBeforeUpdate sumAfterUpdate) in
 
 		// return updated state
@@ -110,22 +110,22 @@ let _burn 		(state:global_state)
 		let s : ref global_state = alloc state in
 		try 		
 			(* i) check that `account` is not zero address (default address) *)
-			let check_from = (FStar.UInt160.eq account default_address) in
+			let check_from : bool = (FStar.UInt160.eq account default_address) in
 			if check_from then 
 				// if address is zero address raise an exception
 				raise Solidity.SolidityZeroAddress
 			else();
 
 			(* ii) check that contract is not paused (mimic of _beforeTokenTransfer hook) *)
-			let hook_check = paused (!s) in 
+			let hook_check : bool = paused (!s) in 
 			if not hook_check then 
 				// if contract is paused
 				raise Solidity.SolidityPaused
 			else();
 
-			let accountBalance = Solidity.get (!s)._balances account in 
+			let accountBalance : uint = Solidity.get (!s)._balances account in 
 				(* iii) check that accountBalance >= amount *)
-				let check_balance = (FStar.UInt256.gte accountBalance amount) in 
+				let check_balance : bool = (FStar.UInt256.gte accountBalance amount) in 
 				if not check_balance then 
 					// if amount > accountBalance
 					raise Solidity.SolidityAmountExceedsBalance
@@ -138,20 +138,20 @@ let _burn 		(state:global_state)
 									- `_totalSupply` is greater [** or equal **] then `accountBalance` 
 									  [** if `accountBalance` contains all available tokens **]
 			***)
-			let _totalSupply = (!s)._totalSupply in 
+			let _totalSupply : uint = (!s)._totalSupply in 
 			let _ = assume (FStar.UInt256.gte Solidity.max_uint _totalSupply) in 
 			let _ = assume (FStar.UInt256.gte _totalSupply accountBalance) in 
 
 			(*	ensure that amount is les or equal to account balance --it has to hold because of the check	*)
 			let _ = assert (FStar.UInt256.lte amount accountBalance) in 
 			
-			let differenceBefore = FStar.UInt256.sub _totalSupply accountBalance in 
+			let differenceBefore : uint = FStar.UInt256.sub _totalSupply accountBalance in 
 			(*	decrease account's balance by amount,  `amount <= accountBalance` *)
 				s := 	{!s with _balances = Solidity.set (!s)._balances account 
 							( FStar.UInt256.sub accountBalance amount )
 						};
 			// Verify that updated balance is exactly for amount smaller then before
-			let updatedBalance = Solidity.get (!s)._balances account in 
+			let updatedBalance : uint = Solidity.get (!s)._balances account in 
 			let _ = assert(FStar.UInt256.eq
 							(FStar.UInt256.add updatedBalance amount)
 							accountBalance) in 
@@ -160,19 +160,19 @@ let _burn 		(state:global_state)
 				s := 	{!s with _totalSupply =  ( FStar.UInt256.sub (!s)._totalSupply amount )};
 			
 			(* iv)  update state with the new event - emit Transfer(account, address(0), amount); *)
-				let events_length_old = length (!s).events_ in 
+				let events_length_old : nat = length (!s).events_ in 
                 s := 	{!s with events_ = Transfer account default_address amount :: (!s).events_};
 			
 			// verify that the events_ list has grown - event has been emitted
-				let events_length_new = length (!s).events_ in 
+				let events_length_new : nat = length (!s).events_ in 
 				let _ = assert(events_length_old < events_length_new) in 
 			
 			(*	ensure that difference between `_totalSupply` and `_balances[account]` remains the 
 				same before and after update							
 			*)
-			let _totalSupplyUpdated = (!s)._totalSupply in 
-			let accountBalanceUpdated = Solidity.get (!s)._balances account in 
-			let differenceAfter = FStar.UInt256.sub _totalSupplyUpdated accountBalanceUpdated in 
+			let _totalSupplyUpdated : uint = (!s)._totalSupply in 
+			let accountBalanceUpdated : uint = Solidity.get (!s)._balances account in 
+			let differenceAfter : uint = FStar.UInt256.sub _totalSupplyUpdated accountBalanceUpdated in 
 			let _ = assert (FStar.UInt256.eq differenceBefore differenceAfter) in
 
 		// return updated state
@@ -199,7 +199,7 @@ let sendToChain		(state:global_state)
 			else ();
 
 			// verify that the bridge cannot be paused
-			let notPaused = not (bridgePaused_check (!s)) in 
+			let notPaused : bool = not (bridgePaused_check (!s)) in 
 			let _ = assert(notPaused) in 
 
 			(* ii) check that fee is big enough `msg.value >= _minimumBridgeFee` *)
@@ -209,7 +209,7 @@ let sendToChain		(state:global_state)
 			else ();
 
 			// Verify that msg.value is >= _minimumBridgeFee
-			let current_min_bridge_fee = (!s)._minimumBridgeFee in 
+			let current_min_bridge_fee : uint = (!s)._minimumBridgeFee in 
 			let _ = assert(FStar.UInt256.gte in_msg.value current_min_bridge_fee) in 
 
 			(* iii) Check that `amount >= _minimumSendToChainAmount` 
@@ -222,24 +222,24 @@ let sendToChain		(state:global_state)
 			else ();
 
 			(* iv) check that `destinationToken` is not zero address (default address) *)
-			let check_dt = (FStar.UInt160.eq destinationToken default_address) in
+			let check_dt : bool = (FStar.UInt160.eq destinationToken default_address) in
 			if check_dt then 
 				// if address is zero address raise an exception
 				raise Solidity.SolidityZeroAddress
 			else();
 
 			(*	Calculate fee -> (amount * _bridgeFee) / 100000000 	*)
-			let fee = FStar.UInt256.add_mod amount (!s)._bridgeFee in 
+			let fee : uint = FStar.UInt256.add_mod amount (!s)._bridgeFee in 
 
 			(* v) check that amount is bigger then fee `amount > fee` *)
-			let check_amount = FStar.UInt256.lte amount fee in 
+			let check_amount : bool = FStar.UInt256.lte amount fee in 
 			if check_amount then 
 				// if `check_amount <= fee`
 				raise Solidity.SolidityInsufficientAmount 
 			else();
 
 			(*	Calculate difference `res`	*)
-			let res = FStar.UInt256.sub amount fee in 
+			let res : uint = FStar.UInt256.sub amount fee in 
 
 			(*	Call `transfer`	*)
             let (ret__, st__) = _transfer (!s) in_msg.sender (!s)._feeTreasury fee in 
@@ -261,12 +261,12 @@ let sendToChain		(state:global_state)
 														*)
 
 														(* vi)  update state with the new event - emit Transfer(account, address(0), amount); *)
-														let events_length_old = length (!s).events_ in
+														let events_length_old : nat = length (!s).events_ in
 														s := 	{!s with events_ = SentToChain in_msg.sender (FStar.UInt256.sub amount fee) 
 																(!s).block.chainid destinationChainId destinationToken :: (!s).events_};
 														
 														 // verify that the events_ list has grown - event has been emitted
-														let events_length_new = length (!s).events_ in 
+														let events_length_new : nat = length (!s).events_ in 
 														let _ = assert(events_length_old < events_length_new) in 
 
 														// return updated state

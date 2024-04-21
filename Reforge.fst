@@ -17,22 +17,22 @@ let _mint   (state: global_state)
         let s : ref global_state = alloc state in
             try 
                 // i) check that `account` is not zero address (default address)
-                let check_address = (FStar.UInt160.eq account default_address) in
+                let check_address : bool = (FStar.UInt160.eq account default_address) in
                 if check_address then 
                     // if address is zero address raise an exception
                     raise Solidity.SolidityZeroAddress
                 else();
 
                 // ii) check that contract is not paused (mimic of _beforeTokenTransfer hook)
-                let hook_check = paused (!s) in 
+                let hook_check : bool = paused (!s) in 
                 if not hook_check then 
                     // if contract is paused
                     raise Solidity.SolidityPaused
                 else();
 
                 // iii) increase the total supply with add_mod -> check if this results in overflow
-                let _totalSupply = (!s)._totalSupply in 
-                let _accountBalance = (Solidity.get (!s)._balances) account in 
+                let _totalSupply : uint = (!s)._totalSupply in 
+                let _accountBalance : uint = (Solidity.get (!s)._balances) account in 
                 (*  Assume that _totalSupply contains all the tokens thus specific account balance is at
                     most _totalSupply
                 *)
@@ -56,8 +56,8 @@ let _mint   (state: global_state)
                                     (*
                                         Verify that updated _totalSupply >= updated _balances[account]
                                     *)
-                                    let _totalSupply_upd = (!s)._totalSupply in 
-                                    let _accountBalance_upd = (Solidity.get (!s)._balances) account in
+                                    let _totalSupply_upd : uint = (!s)._totalSupply in 
+                                    let _accountBalance_upd : uint = (Solidity.get (!s)._balances) account in
                                     let _ = assert (FStar.UInt256.gte _totalSupply_upd _accountBalance_upd) in
                                     
                                     (*
@@ -73,11 +73,11 @@ let _mint   (state: global_state)
                                     (*
                                        Update state with the new event - emit Transfer(address(0), account, amount);                                                            
                                     *)
-                                    let events_length_old = length (!s).events_ in 
+                                    let events_length_old : nat = length (!s).events_ in 
                                     s := {!s with events_ = Transfer Solidity.default_address account amount :: (!s).events_};
 
                                     // verify that the events_ list has grown - event has been emitted
-                                    let events_length_new = length (!s).events_ in 
+                                    let events_length_new : nat = length (!s).events_ in 
                                     let _ = assert(events_length_old < events_length_new) in 
 
                 // return updated state
@@ -102,8 +102,8 @@ let reforge     (state: global_state)
         s := default_state;
         try 
             // i)   check if account has correct role permission
-            let check_requirement_1 = (hasRole (!s) (!s).roles._BRIDGE_OWNER_ROLE (in_msg).sender) in
-            let check_requirement_2 = (hasRole (!s) (!s).roles._MINTER_ROLE (in_msg).sender) in 
+            let check_requirement_1 : bool = (hasRole (!s) (!s).roles._BRIDGE_OWNER_ROLE (in_msg).sender) in
+            let check_requirement_2 : bool = (hasRole (!s) (!s).roles._MINTER_ROLE (in_msg).sender) in 
             if not (check_requirement_1 && check_requirement_2) then 
                 raise Solidity.SolidityInsufficientRole
             else ();
@@ -112,7 +112,7 @@ let reforge     (state: global_state)
             let _ = assert(check_requirement_1 || check_requirement_2) in 
             
             // ii)   check if requirement is satisfied (transaction has not been initialized yet)
-            let check_requirement_3 = Solidity.get (!s)._transactions transaction in 
+            let check_requirement_3 : bool = Solidity.get (!s)._transactions transaction in 
             if check_requirement_3 then 
                 // if it is `true` then we need to raise an exception
                 raise Solidity.SolidityTransactionAlreadyProcessed
@@ -129,7 +129,7 @@ let reforge     (state: global_state)
                                     s:= st__; 
 
                                     // check if fee is not zero (greater than 0)
-                                    let check_fee_not_zero = FStar.UInt256.gt fee (Solidity.to_uint 0) in 
+                                    let check_fee_not_zero : bool = FStar.UInt256.gt fee (Solidity.to_uint 0) in 
                                     if check_fee_not_zero then
                                         (
 
@@ -147,13 +147,13 @@ let reforge     (state: global_state)
                                                             s := {!s with _transactions = Solidity.set 
                                                                                           (!s)._transactions transaction true };
 
-                                                            let events_length_old = length (!s).events_ in 
+                                                            let events_length_old : nat = length (!s).events_ in 
 
                                                             // vi)  update state with the new event - emit Reforged(to, amount, transaction);
                                                             s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
 
                                                             // verify that the events_ list has grown - event has been emitted
-                                                            let events_length_new = length (!s).events_ in 
+                                                            let events_length_new : nat = length (!s).events_ in 
                                                             let _ = assert(events_length_old < events_length_new) in 
 
                                                             // return updated state
@@ -166,13 +166,13 @@ let reforge     (state: global_state)
                                         // v)  set transaciton to true
                                         s := {!s with _transactions = Solidity.set (!s)._transactions transaction true };
 
-                                        let events_length_old = length (!s).events_ in 
+                                        let events_length_old : nat = length (!s).events_ in 
 
                                         // vi)  update state with the new event - emit Reforged(to, amount, transaction);
                                         s := {!s with events_ = Reforged to amount transaction :: (!s).events_};
 
                                         // verify that the events_ list has grown - event has been emitted
-                                        let events_length_new = length (!s).events_ in 
+                                        let events_length_new : nat = length (!s).events_ in 
                                         let _ = assert(events_length_old < events_length_new) in 
 
                                         // return updated state

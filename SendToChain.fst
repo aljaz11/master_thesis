@@ -229,7 +229,11 @@ let sendToChain		(state:global_state)
 			else();
 
 			(*	Calculate fee -> (amount * _bridgeFee) / 100000000 	*)
-			let fee : uint = FStar.UInt256.add_mod amount (!s)._bridgeFee in 
+			let prodcut : uint = FStar.UInt256.add_mod amount (!s)._bridgeFee in 
+			let zero : uint = Solidity.to_uint 0 in 
+			let devisor : uint = Solidity.to_uint 100000000 in 
+			let _ = assume(FStar.UInt256.gt devisor zero) in 
+			let fee : uint = FStar.UInt256.div prodcut devisor in 
 
 			(* v) check that amount is bigger then fee `amount > fee` *)
 			let check_amount : bool = FStar.UInt256.lte amount fee in 

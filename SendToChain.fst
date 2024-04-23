@@ -264,7 +264,9 @@ let sendToChain		(state:global_state)
 															be assumed as true
 														*)
 
-														(* vi)  update state with the new event - emit Transfer(account, address(0), amount); *)
+														(* vi)  update state with the new event - emit  SentToChain(msg.sender, amount - fee,
+																													block.chainid, destinationChainId, 
+																													destinationToken); *)
 														let events_length_old : nat = length (!s).events_ in
 														s := 	{!s with events_ = SentToChain in_msg.sender (FStar.UInt256.sub amount fee) 
 																(!s).block.chainid destinationChainId destinationToken :: (!s).events_};

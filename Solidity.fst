@@ -14,8 +14,8 @@ open FStar.List
 open FStar.Map
 
 (*   Define basic types and their basics methods  *)
-type uint = FStar.UInt256.t
-type int256 = FStar.Int.int_t 256
+type uint:eqtype = FStar.UInt256.t
+type int256:eqtype = FStar.Int.int_t 256
 
 val to_uint: int -> Tot uint
 let to_uint n = FStar.UInt256.uint_to_t (FStar.UInt.to_uint_t 256 n) 
@@ -69,7 +69,7 @@ let list_set #a lst n elem =
 // as well as `sel` and `upd`
 type mapping = FStar.Map.t
 
-type msg = {
+type msg:eqtype = {
      value : uint;
      sender: address;
 }
@@ -78,7 +78,7 @@ assume val getMessage: unit -> ST msg
        (requires (fun h -> true))
        (ensures (fun h x h' -> h == h'))
 
-type block = {
+type block:eqtype = {
      number : uint;
 }
 

@@ -6,7 +6,7 @@ open FStar.String
     New type string_66 that only allows strings with 66 characters
     effectively simulating hexadecimal number of length 64 (+ '0x') == 256 bit number == 32 bytes
 *)
-type string_66 = s:string {length s = 66}   // another way to represent 32byte values
+type string_66:eqtype = s:string {length s = 66}   // another way to represent 32byte values
 
 let default_string_66 : string_66 = 
     let def_str = "0x0000000000000000000000000000000000000000000000000000000000000000" in
@@ -70,7 +70,7 @@ let bridger_owner_keccak : string_66 =
                                 uint256 fromChainId, uint256 indexed destinationChainId, 
                                 address indexed destinationToken);
 *)
-type event = 
+type event:eqtype = 
     | Reforged      : address -> uint -> string_66 -> event
     | Transfer      : address -> address -> uint -> event 
     | SentToChain   : address -> uint -> uint -> uint -> address -> event
@@ -86,7 +86,7 @@ type role =
 	| BRIDGE_OWNER_ROLE  : string_66 -> role
     | ADMIN_eEUR         : string_66 -> role
 *)
-type role = { 
+type role:eqtype = { 
 	_PAUSER_ROLE        : string_66;
 	_MINTER_ROLE        : string_66;
 	_UPGRADER_ROLE      : string_66; 
@@ -106,7 +106,7 @@ noeq type _RoleData = {
 (*
 Struct symulating `block` property (only what is needed/relevant in SendToChain function)
 *)
-type block_t = {
+type block_t:eqtype = {
     chainid     : uint;
 }
 

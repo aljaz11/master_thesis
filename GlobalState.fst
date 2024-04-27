@@ -106,7 +106,7 @@ noeq type _RoleData = {
 (*
 Struct symulating `block` property (only what is needed/relevant in SendToChain function)
 *)
-noeq type block_t = {
+type block_t = {
     chainid     : uint;
 }
 

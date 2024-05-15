@@ -108,8 +108,8 @@ let reforge     (state: global_state)
                 raise Solidity.SolidityInsufficientRole
             else ();
 
-            // Verify that account must have either of the two roles (BRIDGE_OWNER_ROLE or MINTER_ROLE)
-            let _ = assert(check_requirement_1 || check_requirement_2) in 
+            // Verify that account must have both of the two roles (BRIDGE_OWNER_ROLE or MINTER_ROLE)
+            let _ = assert(check_requirement_1 && check_requirement_2) in 
             
             // ii)   check if requirement is satisfied (transaction has not been initialized yet)
             let check_requirement_3 : bool = Solidity.get (!s)._transactions transaction in 
